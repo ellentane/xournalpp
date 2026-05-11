@@ -64,24 +64,20 @@ void BaseExportJob::showFileChooser(std::function<void()> onFileSelected, std::f
         return job->testAndSetFilepath(p);
     };
 
-    auto callback = [settings, onFileSelected = std::move(onFileSelected),
+    auto configure = [job = this](GtkFileChooser* fc) { job->addFilterToDialog(fc); };
+
+    auto callback = [onFileSelected = std::move(onFileSelected),
                      onCancel = std::move(onCancel)](std::optional<fs::path> p) {
         if (p && !p->empty()) {
-            settings->setLastSavePath(p->parent_path());
             onFileSelected();
         } else {
             onCancel();
         }
     };
 
-    auto popup = xoj::popup::PopupWindowWrapper<xoj::SaveExportDialog>(control->getSettings(), std::move(suggestedPath),
-                                                                       _("Export File"), _("Export"),
-                                                                       std::move(pathValidation), std::move(callback));
-
-    auto* fc = GTK_FILE_CHOOSER(popup.getPopup()->getWindow());
-    addFilterToDialog(fc);
-
-    popup.show(GTK_WINDOW(this->control->getWindow()->getWindow()));
+    xoj::dlg::showSaveDialog(GTK_WINDOW(this->control->getWindow()->getWindow()), control->getSettings(),
+                             std::move(suggestedPath), _("Export File"), std::move(configure),
+                             std::move(pathValidation), std::move(callback));
 }
 
 auto BaseExportJob::testAndSetFilepath(const fs::path& file) -> bool {

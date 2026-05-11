@@ -177,17 +177,15 @@ static void saveLog(const std::stringstream& fullLog, const std::stringstream& e
         }
     };
 
-    auto popup = xoj::popup::PopupWindowWrapper<xoj::SaveExportDialog>(
-            nullptr, fs::path(), _("Export Logs"), _("Export"), std::move(pathValidation), std::move(callback));
+    auto configure = [](GtkFileChooser* fc) {
+        GtkFileFilter* filter = gtk_file_filter_new();
+        gtk_file_filter_set_name(filter, "ZIP archive");
+        gtk_file_filter_add_mime_type(filter, "application/zip");
+        gtk_file_chooser_add_filter(fc, filter);
+    };
 
-    auto* fc = GTK_FILE_CHOOSER(popup.getPopup()->getWindow());
-
-    GtkFileFilter* filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, "ZIP archive");
-    gtk_file_filter_add_mime_type(filter, "application/zip");
-    gtk_file_chooser_add_filter(fc, filter);
-
-    popup.show(GTK_WINDOW(gtk_widget_get_ancestor(parent, GTK_TYPE_WINDOW)));
+    xoj::dlg::showSaveDialog(GTK_WINDOW(gtk_widget_get_ancestor(parent, GTK_TYPE_WINDOW)), settings, fs::path(),
+                             _("Export Logs"), std::move(configure), std::move(pathValidation), std::move(callback));
 }
 
 DeviceTestingArea::DeviceTestingArea(GladeSearchpath* gladeSearchPath, GtkBox* parent, Settings* settings):
