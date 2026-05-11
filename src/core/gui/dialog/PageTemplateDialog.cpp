@@ -14,14 +14,14 @@
 #include "control/settings/Settings.h"         // for Settings
 #include "gui/Builder.h"                       // for Builder
 #include "gui/dialog/XojOpenDlg.h"             // for XojOpenDlg
+#include "gui/dialog/XojSaveDlg.h"             // for showSaveDialog
 #include "gui/menus/popoverMenus/PageTypeSelectionPopoverGridOnly.h"
 #include "gui/toolbarMenubar/ToolMenuHandler.h"
 #include "model/FormatDefinitions.h"  // for FormatUnits, XOJ_UNITS
 #include "model/PageType.h"           // for PageType
 #include "util/Color.h"               // for GdkRGBA_to_argb, rgb_t...
-#include "util/PathUtil.h"            // for fromGFile, readString
+#include "util/PathUtil.h"            // for readString
 #include "util/PopupWindowWrapper.h"  // for PopupWindowWrapper
-#include "util/XojMsgBox.h"           // for XojMsgBox
 #include "util/i18n.h"                // for _
 #include "util/serdesstream.h"        // for serdes_stream
 
@@ -112,70 +112,32 @@ void PageTemplateDialog::saveToModel() {
 void PageTemplateDialog::saveToFile() {
     saveToModel();
 
-    GtkWidget* dialog =
-            gtk_file_chooser_dialog_new(_("Save File"), this->getWindow(), GTK_FILE_CHOOSER_ACTION_SAVE, _("_Cancel"),
-                                        GTK_RESPONSE_CANCEL, _("_Save"), GTK_RESPONSE_OK, nullptr);
-
-    GtkFileFilter* filterXoj = gtk_file_filter_new();
-    gtk_file_filter_set_name(filterXoj, _("Xournal++ template"));
-    gtk_file_filter_add_mime_type(filterXoj, "application/x-xopt");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filterXoj);
-
-    if (!settings->getLastSavePath().empty()) {
-        gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), Util::toGFile(settings->getLastSavePath()).get(),
-                                            nullptr);
-    }
-
     time_t curtime = time(nullptr);
     char stime[128];
     strftime(stime, sizeof(stime), "%F-Template-%H-%M.xopt", localtime(&curtime));
-    fs::path saveFilename = stime;  // There may be an issue here, if the C and C++ locales do not use the same encoding
+    fs::path suggestedPath = settings->getLastSavePath();
+    // There may be an issue here, if the C and C++ locales do not use the same encoding
+    suggestedPath /= stime;
 
-    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), Util::toGFilename(saveFilename).c_str());
-
-    class FileDlg final {
-    public:
-        FileDlg(GtkDialog* dialog, PageTemplateDialog* parent): window(GTK_WINDOW(dialog)), parent(parent) {
-            this->signalId = g_signal_connect(
-                    dialog, "response", G_CALLBACK((+[](GtkDialog* dialog, int response, gpointer data) {
-                        FileDlg* self = static_cast<FileDlg*>(data);
-                        if (response == GTK_RESPONSE_OK) {
-                            auto file = Util::fromGFile(
-                                    xoj::util::GObjectSPtr<GFile>(gtk_file_chooser_get_file(GTK_FILE_CHOOSER(dialog)),
-                                                                  xoj::util::adopt)
-                                            .get());
-
-                            auto saveTemplate = [self, dialog](const fs::path& file) {
-                                // Closing the window causes another "response" signal, which we want to ignore
-                                g_signal_handler_disconnect(dialog, self->signalId);
-                                gtk_window_close(GTK_WINDOW(dialog));
-                                self->parent->settings->setLastSavePath(file.parent_path());
-
-                                auto out = serdes_stream<std::ofstream>(file);
-                                out << self->parent->model.toString();
-                            };
-                            XojMsgBox::replaceFileQuestion(GTK_WINDOW(dialog), std::move(file),
-                                                           std::move(saveTemplate));
-                        } else {
-                            // Closing the window causes another "response" signal, which we want to ignore
-                            g_signal_handler_disconnect(dialog, self->signalId);
-                            gtk_window_close(GTK_WINDOW(dialog));  // Deletes self, don't do anything after this
-                        }
-                    })),
-                    this);
-        }
-        ~FileDlg() = default;
-
-        inline GtkWindow* getWindow() const { return window.get(); }
-
-    private:
-        xoj::util::GtkWindowUPtr window;
-        PageTemplateDialog* parent;
-        gulong signalId;
+    auto configure = [](GtkFileChooser* fc) {
+        GtkFileFilter* filterXoj = gtk_file_filter_new();
+        gtk_file_filter_set_name(filterXoj, _("Xournal++ template"));
+        gtk_file_filter_add_mime_type(filterXoj, "application/x-xopt");
+        gtk_file_chooser_add_filter(fc, filterXoj);
     };
 
-    auto popup = xoj::popup::PopupWindowWrapper<FileDlg>(GTK_DIALOG(dialog), this);
-    popup.show(GTK_WINDOW(this->getWindow()));
+    auto pathValidation = [](fs::path&, const char*) { return true; };
+
+    auto callback = [self = this](std::optional<fs::path> selected) {
+        if (!selected || selected->empty()) {
+            return;
+        }
+        auto out = serdes_stream<std::ofstream>(*selected);
+        out << self->model.toString();
+    };
+
+    xoj::dlg::showSaveDialog(this->getWindow(), settings, std::move(suggestedPath), _("Save File"), std::move(configure),
+                             std::move(pathValidation), std::move(callback));
 }
 
 void PageTemplateDialog::loadFromFile() {
