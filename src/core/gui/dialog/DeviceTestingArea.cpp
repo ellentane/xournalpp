@@ -9,6 +9,7 @@
 
 #include "control/settings/Settings.h"
 #include "gui/Builder.h"
+#include "gui/dialog/FileChooserFiltersHelper.h"
 #include "gui/dialog/XojSaveDlg.h"
 #include "gui/inputdevices/InputContext.h"
 #include "gui/inputdevices/InputEvents.h"
@@ -178,10 +179,9 @@ static void saveLog(const std::stringstream& fullLog, const std::stringstream& e
     };
 
     auto configure = [](GtkFileChooser* fc) {
-        GtkFileFilter* filter = gtk_file_filter_new();
-        gtk_file_filter_set_name(filter, "ZIP archive");
-        gtk_file_filter_add_mime_type(filter, "application/zip");
-        gtk_file_chooser_add_filter(fc, filter);
+        // MIME-based filters force GtkFileChooserNative to fall back to the GTK dialog
+        // on Windows, so use the shared extension-based helper instead.
+        xoj::addFilterZip(fc);
     };
 
     xoj::dlg::showSaveDialog(GTK_WINDOW(gtk_widget_get_ancestor(parent, GTK_TYPE_WINDOW)), nullptr, fs::path(),

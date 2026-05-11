@@ -10,11 +10,12 @@
 #include <gdk/gdk.h>      // for GdkRGBA
 #include <glib-object.h>  // for G_CALLBACK, g_signal_c...
 
-#include "control/pagetype/PageTypeHandler.h"  // for PageTypeInfo, PageType...
-#include "control/settings/Settings.h"         // for Settings
-#include "gui/Builder.h"                       // for Builder
-#include "gui/dialog/XojOpenDlg.h"             // for XojOpenDlg
-#include "gui/dialog/XojSaveDlg.h"             // for showSaveDialog
+#include "control/pagetype/PageTypeHandler.h"     // for PageTypeInfo, PageType...
+#include "control/settings/Settings.h"            // for Settings
+#include "gui/Builder.h"                          // for Builder
+#include "gui/dialog/FileChooserFiltersHelper.h"  // for addFilterXopt
+#include "gui/dialog/XojOpenDlg.h"                // for XojOpenDlg
+#include "gui/dialog/XojSaveDlg.h"                // for showSaveDialog
 #include "gui/menus/popoverMenus/PageTypeSelectionPopoverGridOnly.h"
 #include "gui/toolbarMenubar/ToolMenuHandler.h"
 #include "model/FormatDefinitions.h"  // for FormatUnits, XOJ_UNITS
@@ -65,16 +66,16 @@ PageTemplateDialog::PageTemplateDialog(GladeSearchpath* gladeSearchPath, Setting
                              G_CALLBACK(+[](PageTemplateDialog* self) { self->saveToFile(); }), this);
 
     g_signal_connect_swapped(builder.get("btCancel"), "clicked", G_CALLBACK(gtk_window_close), this->getWindow());
-    g_signal_connect_swapped(builder.get("btOk"), "clicked", G_CALLBACK(+[](PageTemplateDialog* self) {
-                                 self->saveToModel();
-                                 self->settings->setPageTemplateSettings(self->model);
-                                 self->toolMenuHandler->setDefaultNewPageType(self->model.getPageInsertType());
-                                 self->toolMenuHandler->setDefaultNewPaperSize(
-                                         self->model.isCopyLastPageSize() ? std::nullopt :
-                                                                            std::optional(PaperSize(self->model)));
-                                 gtk_window_close(self->getWindow());
-                             }),
-                             this);
+    g_signal_connect_swapped(
+            builder.get("btOk"), "clicked", G_CALLBACK(+[](PageTemplateDialog* self) {
+                self->saveToModel();
+                self->settings->setPageTemplateSettings(self->model);
+                self->toolMenuHandler->setDefaultNewPageType(self->model.getPageInsertType());
+                self->toolMenuHandler->setDefaultNewPaperSize(
+                        self->model.isCopyLastPageSize() ? std::nullopt : std::optional(PaperSize(self->model)));
+                gtk_window_close(self->getWindow());
+            }),
+            this);
 
     updateDataFromModel();
 }
@@ -120,10 +121,8 @@ void PageTemplateDialog::saveToFile() {
     suggestedPath /= stime;
 
     auto configure = [](GtkFileChooser* fc) {
-        GtkFileFilter* filterXoj = gtk_file_filter_new();
-        gtk_file_filter_set_name(filterXoj, _("Xournal++ template"));
-        gtk_file_filter_add_mime_type(filterXoj, "application/x-xopt");
-        gtk_file_chooser_add_filter(fc, filterXoj);
+        // Use the shared pattern-based filter so the Win32 native chooser stays native.
+        xoj::addFilterXopt(fc);
     };
 
     auto pathValidation = [](fs::path&, const char*) { return true; };

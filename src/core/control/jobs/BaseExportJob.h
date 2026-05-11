@@ -43,7 +43,14 @@ public:
 
 protected:
     virtual void addFilterToDialog(GtkFileChooser* dialog) = 0;
-    static void addFileFilterToDialog(GtkFileChooser* dialog, const std::string& name, const std::string& mimetype);
+    /**
+     * Add a file-extension filter to @p dialog.
+     *
+     * Export file choosers are GtkFileChooserNative. Its Win32 backend only supports
+     * pattern filters, so @p extension must be a plain extension string with leading
+     * dot (e.g. ".pdf"); MIME types would force a fallback to the GTK dialog.
+     */
+    static void addFileFilterToDialog(GtkFileChooser* dialog, const std::string& name, const std::string& extension);
     bool checkOverwriteBackgroundPDF(fs::path const& file) const;
 
     virtual void setExtensionFromFilter(fs::path& p, const char* filterName) const = 0;
@@ -67,8 +74,7 @@ protected:
     class ExportType {
     public:
         std::string extension;
-        std::string mimeType;
 
-        ExportType(std::string ext, std::string mime): extension(std::move(ext)), mimeType(std::move(mime)) {}
+        explicit ExportType(std::string ext): extension(std::move(ext)) {}
     };
 };

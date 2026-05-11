@@ -4,27 +4,28 @@
 
 #include <glib.h>  // for g_warning
 
-#include "control/Control.h"            // for Control
-#include "control/jobs/BlockingJob.h"   // for BlockingJob
-#include "control/settings/Settings.h"  // for Settings
-#include "gui/MainWindow.h"             // for MainWindow
+#include "control/Control.h"                      // for Control
+#include "control/jobs/BlockingJob.h"             // for BlockingJob
+#include "control/settings/Settings.h"            // for Settings
+#include "gui/MainWindow.h"                       // for MainWindow
+#include "gui/dialog/FileChooserFiltersHelper.h"  // for addFilterByExtension
 #include "gui/dialog/XojSaveDlg.h"
-#include "model/Document.h"             // for Document, Document::PDF
-#include "util/PathUtil.h"              // for clearExtensions
-#include "util/PopupWindowWrapper.h"    // for PopupWindowWrapper
-#include "util/XojMsgBox.h"             // for XojMsgBox
-#include "util/glib_casts.h"            // for wrap_for_g_callback_v
-#include "util/i18n.h"                  // for _, FS, _F
+#include "model/Document.h"           // for Document, Document::PDF
+#include "util/PathUtil.h"            // for clearExtensions
+#include "util/PopupWindowWrapper.h"  // for PopupWindowWrapper
+#include "util/XojMsgBox.h"           // for XojMsgBox
+#include "util/glib_casts.h"          // for wrap_for_g_callback_v
+#include "util/i18n.h"                // for _, FS, _F
 
 BaseExportJob::BaseExportJob(Control* control, const std::string& name): BlockingJob(control, name) {}
 
 BaseExportJob::~BaseExportJob() = default;
 
-void BaseExportJob::addFileFilterToDialog(GtkFileChooser* dialog, const std::string& name, const std::string& mime) {
-    GtkFileFilter* filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, name.c_str());
-    gtk_file_filter_add_mime_type(filter, mime.c_str());
-    gtk_file_chooser_add_filter(dialog, filter);
+void BaseExportJob::addFileFilterToDialog(GtkFileChooser* dialog, const std::string& name,
+                                          const std::string& extension) {
+    // Route through the shared native-compatible helper. Using gtk_file_filter_add_mime_type()
+    // here would make GtkFileChooserNative fall back to the GTK dialog on Windows.
+    xoj::addFilterByExtension(dialog, name.c_str(), {extension.c_str()});
 }
 
 auto BaseExportJob::checkOverwriteBackgroundPDF(fs::path const& file) const -> bool {

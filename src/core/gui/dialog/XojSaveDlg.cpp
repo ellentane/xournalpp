@@ -22,13 +22,24 @@ xoj::util::GObjectSPtr<GtkFileChooserNative> makeSaveDialog(Settings* settings, 
 
     auto* fc = GTK_FILE_CHOOSER(dialog.get());
 
+    // Let the native dialog show its own "file exists" prompt when it can. The post-dialog
+    // replaceFileQuestion() still runs because pathValidation may append an extension that
+    // turns the chosen name into a pre-existing file, which the OS dialog cannot foresee.
+    gtk_file_chooser_set_do_overwrite_confirmation(fc, TRUE);
+
     if (!suggestedPath.empty()) {
         gtk_file_chooser_set_current_folder(fc, Util::toGFile(suggestedPath.parent_path()).get(), nullptr);
         gtk_file_chooser_set_current_name(fc, Util::toGFilename(suggestedPath.filename()).c_str());
     }
     if (settings) {
-        // Silently ignored by the Win32 and macOS native backends.
-        gtk_file_chooser_add_shortcut_folder(fc, Util::toGFile(settings->getLastOpenPath()).get(), nullptr);
+#if !defined(__APPLE__)
+        // Shortcut folders are honoured by the Win32 native backend (mapped to IFileDialog
+        // "places") but the macOS native panel does not support them at all, so skip the
+        // call there to avoid touching features that could still surprise the backend.
+        if (!settings->getLastOpenPath().empty()) {
+            gtk_file_chooser_add_shortcut_folder(fc, Util::toGFile(settings->getLastOpenPath()).get(), nullptr);
+        }
+#endif
     }
 
     return dialog;

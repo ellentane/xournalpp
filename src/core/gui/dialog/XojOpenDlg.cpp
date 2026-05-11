@@ -50,8 +50,10 @@ std::function<void(fs::path, Args...)> addSetLastSavePathToCallback(std::functio
 constexpr auto ATTACH_CHOICE_ID = "attachPdfChoice";
 
 void addAttachChoice(GtkFileChooser* fc) {
-    // GtkFileChooserNative ignores add_choice on the Win32 and macOS backends; on those
-    // platforms the attach option is not shown and the default ("false") is used.
+    // Native backends vary in how much GtkFileChooser "choice" UI they can expose. If a
+    // backend can't render the toggle, the stored default ("false") is still returned by
+    // gtk_file_chooser_get_choice() when the response handler reads it back, so the flow
+    // degrades gracefully.
     gtk_file_chooser_add_choice(fc, ATTACH_CHOICE_ID, _("Attach file to the journal"), nullptr, nullptr);
     gtk_file_chooser_set_choice(fc, ATTACH_CHOICE_ID, "false");
 }
